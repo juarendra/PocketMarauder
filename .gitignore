@@ -1,0 +1,24 @@
+# Build artifacts
+.pio/
+build/
+*.bin
+*.elf
+*.o
+*.hex.tmp
+
+# Temp / clones
+_tmp_*/
+*.original.md
+
+# Editor / OS
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local agent context (per AGENTS.md)
+.cooper/context/
+
+# EAGLE backups
+*.b#*
+*.s#*
+*.l#*
