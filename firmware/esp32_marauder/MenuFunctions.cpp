@@ -2401,6 +2401,11 @@ void MenuFunctions::RunSetup()
     this->drawStatusBar();
     wifi_scan_obj.StartScan(WIFI_SCAN_SAE_COMMIT, TFT_GREEN);
   });
+  this->addNodes(&wifiSnifferMenu, "WPS Scan", TFTYELLOW, PINESCAN_SNIFF, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.StartScan(WIFI_SCAN_WPS, TFT_YELLOW);
+  });
 
   // Build Wardriving menu
   #ifdef HAS_GPS
@@ -2455,6 +2460,16 @@ void MenuFunctions::RunSetup()
     display_obj.clearScreen();
     this->drawStatusBar();
     wifi_scan_obj.StartScan(WIFI_ATTACK_AUTH, TFT_RED);
+  });
+  this->addNodes(&wifiAttackMenu, "Probe Spam", TFTMAGENTA, PROBE_SNIFF, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.StartScan(WIFI_ATTACK_PROBE_SPAM, TFT_MAGENTA);
+  });
+  this->addNodes(&wifiAttackMenu, "Roam Bait", TFTLIME, BEACON_SPAM, [this]() {
+    display_obj.clearScreen();
+    this->drawStatusBar();
+    wifi_scan_obj.StartScan(WIFI_ATTACK_ROAM_BAIT, TFT_GREEN);
   });
   this->addNodes(&wifiAttackMenu, "Evil Portal", TFTORANGE, BEACON_SNIFF, [this]() {
 
@@ -3629,6 +3644,31 @@ void MenuFunctions::RunSetup()
           });
         }
         this->changeMenu(&wifiAPMenu, true);
+      });
+      #endif
+
+      #ifdef HAS_NIMBLE_2
+      this->addNodes(&bluetoothAttackMenu, "GATT Explore", TFTGREEN, ATTACKS, [this](){
+          wifiAPMenu.parentMenu = &bluetoothAttackMenu;
+          wifiAPMenu.list->clear();
+          this->addNodes(&wifiAPMenu, text09, TFTLIGHTGREY, 0, [this]() {
+            this->changeMenu(wifiAPMenu.parentMenu, true);
+          });
+
+          int menu_limit = ble_devices->size();
+          for (int i = 0; i < menu_limit; i++) {
+            uint8_t node_color = rssiToMenuColor(ble_devices->get(i).rssi);
+            String node_name = String(ble_devices->get(i).rssi) + " " +
+                               (ble_devices->get(i).name.length() ? ble_devices->get(i).name
+                                                                    : macToString(ble_devices->get(i).mac));
+            this->addNodes(&wifiAPMenu, node_name.c_str(), node_color, BLUETOOTH, [this, i](){
+              wifi_scan_obj.setGattTarget(ble_devices->get(i).mac);
+              display_obj.clearScreen();
+              this->drawStatusBar();
+              wifi_scan_obj.StartScan(BT_GATT_EXPLORE, TFT_GREEN);
+            });
+          }
+          this->changeMenu(&wifiAPMenu, true);
       });
       #endif
 

@@ -5,6 +5,21 @@ Conventional Commits; each entry: context, change (paths), evidence, impact, rol
 
 ## Unreleased
 
+### feat: add 4 pentest features (WPS scan, probe spam, GATT explore, roam bait) for POCKET_MARAUDER
+- Context: user requested 4 additive pentest tools wired into the menu + scan dispatch. All legal-equivalent (no RF jammer). WPS downgraded to a passive scanner (ESP32 has no WPS supplicant injection).
+- Change (all `POCKET_MARAUDER`-neutral; new scan-mode ids 87-90):
+  - `firmware/esp32_marauder/WiFiScan.h`: added `WIFI_SCAN_WPS 87`, `WIFI_ATTACK_PROBE_SPAM 88`, `WIFI_ATTACK_ROAM_BAIT 89`, `BT_GATT_EXPLORE 90`; method decls `sendProbeFlood`, `broadcastRoamBait`, `beaconWPSInfo`, `runGattExplore`(NimBLE2), `RunWPSScan`, `RunGattExplore`, `setGattTarget` (public); members `gatt_target[6]`, `gatt_target_set`.
+  - `firmware/esp32_marauder/WiFiScan.cpp`:
+    - Feature 1 WPS: `beaconWPSInfo()` walks IEs for WPS vendor IE (OUI 00:50:F2 type 0x04), extracts Config Methods `0x1008` + AP-Setup-Locked `0x1057`; `apSnifferCallbackFull` WPS branch flags PIN-PRONE/LOCKED per beacon/probe-resp and prints to serial + OLED; `RunWPSScan()` promiscuous setup; channel-hop branch in `main()`.
+    - Feature 2 probe spam: `sendProbeFlood()` floods probe requests with random SSIDs (1-32 chars via `alfa[random(65)]`) + random src MAC; `main()` loops 55x/tick + channel hop.
+    - Feature 3 GATT explore: `runGattExplore(NimBLEAddress&)` connects (NimBLE 2.x client), enumerates services/characteristics (R/W/N/I props + read values), prints to serial; `RunGattExplore()` entry pulls target set via `setGattTarget()`; guarded `#ifdef HAS_BT`/`HAS_NIMBLE_2`.
+    - Feature 4 roam bait: `broadcastRoamBait()` beacons with 802.11r Mobility Domain IE (tag `0x36`) + 802.11k RM Enabled Caps IE (tag `0x46`, neighbor-report bit); `main()` per-tick TX.
+    - Wired all 4 into `StartScan()`, `StopScan()` OR-chains (WiFi + BT), `main()`.
+  - `firmware/esp32_marauder/MenuFunctions.cpp`: menu nodes — "WPS Scan" in `wifiSnifferMenu`; "Probe Spam" + "Roam Bait" in `wifiAttackMenu`; "GATT Explore" device submenu (populated from `ble_devices`) in `bluetoothAttackMenu` under `#ifdef HAS_NIMBLE_2`.
+- Evidence: `python -m platformio run -e pocket_marauder` -> `SUCCESS`, RAM 24.9% (81724/327680), Flash 81.7% (1605679/1966080). On-device verification PENDING (no ESP32 hardware attached; `pio device list` shows only BT serial COM ports).
+- Impact: 4 new menu-launchable pentest modes; no stock target or `[env:native]` touched.
+- Rollback: revert the WiFiScan.h/.cpp + MenuFunctions.cpp hunks; remove the 4 `#define`s (87-90).
+
 ### feat: enable battery ADC sensing + activity LED for POCKET_MARAUDER
 - Context: board has a LiPo path (TP4056/DW01A/FS8205A) with a voltage divider on IO34 (net `D34`) and a green GPIO LED on IO19 (net `LED`, active-low). Firmware had battery/LED disabled for this target; user wants a battery state indicator + percentage on the OLED and the LED driven by firmware.
 - Change:

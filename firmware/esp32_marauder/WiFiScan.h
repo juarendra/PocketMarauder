@@ -176,6 +176,10 @@
 #define BT_SCAN_FOX_HUNT 84
 #define BT_FINDMY_SOUND 85
 #define BT_ATTACK_FINDMY_LIVE 86
+#define WIFI_SCAN_WPS 87
+#define WIFI_ATTACK_PROBE_SPAM 88
+#define WIFI_ATTACK_ROAM_BAIT 89
+#define BT_GATT_EXPLORE 90
 
 #define WIFI_ATTACK_FUNNY_BEACON 99 
 
@@ -795,6 +799,14 @@ class WiFiScan
     void sendEapolBagMsg1(uint8_t bssid[6], int channel, uint8_t mac[6], uint8_t sec = WIFI_SECURITY_WPA2);
     void sendAssociationSleep(const char* ESSID, uint8_t bssid[6], int channel, uint8_t mac[6]);
     void broadcastRandomSSID(uint32_t currentTime);
+    void sendProbeFlood(uint32_t currentTime);
+    void broadcastRoamBait(uint32_t currentTime);
+    static bool beaconWPSInfo(const uint8_t* payload, int len, uint16_t& config_methods, bool& locked);
+    #ifdef HAS_NIMBLE_2
+      void runGattExplore(NimBLEAddress& address);
+    #endif
+    void RunWPSScan(uint8_t scan_mode, uint16_t color);
+    void RunGattExplore(uint8_t scan_mode, uint16_t color);
     void broadcastCustomBeacon(uint32_t current_time, ssid custom_ssid, bool for_camera = false);
     void broadcastCustomBeacon(uint32_t current_time, AccessPoint custom_ssid, int scan_mode);
     void broadcastSetSSID(uint32_t current_time, const char* ESSID, uint8_t chan = 0, bool legit = false);
@@ -981,6 +993,8 @@ class WiFiScan
     uint16_t network_scan_result_count = 0;
 
     String dst_mac = "ff:ff:ff:ff:ff:ff";
+    uint8_t gatt_target[6] = {};
+    bool gatt_target_set = false;
     byte src_mac[6] = {};
 
     #ifdef HAS_SCREEN
@@ -1053,6 +1067,7 @@ class WiFiScan
                                    const BleDevice& ble_device);
     #endif
     void setFoxHuntTarget(const uint8_t mac[6], const String& name, int8_t rssi, uint8_t channel, bool bluetooth, const String& advertised_address = "");
+    void setGattTarget(const uint8_t* mac);
     bool updateFoxHuntRssi(const uint8_t mac[6], int8_t rssi, uint8_t channel = 0);
     bool updateBluetoothFoxHuntRssi(const uint8_t mac[6], const String& advertised_address, int8_t rssi);
     size_t getPineScanCount() const;

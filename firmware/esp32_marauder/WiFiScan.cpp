@@ -2637,6 +2637,17 @@ void WiFiScan::StartScan(uint8_t scan_mode, uint16_t color) {
     RunEapolScan(scan_mode, color);
   else if (scan_mode == WIFI_SCAN_AP)
     RunBeaconScan(scan_mode, color);
+  else if (scan_mode == WIFI_SCAN_WPS)
+    RunWPSScan(scan_mode, color);
+  else if (scan_mode == WIFI_ATTACK_PROBE_SPAM)
+    this->startWiFiAttacks(scan_mode, color, "Probe Spam");
+  else if (scan_mode == WIFI_ATTACK_ROAM_BAIT)
+    this->startWiFiAttacks(scan_mode, color, "Roam Bait");
+  else if (scan_mode == BT_GATT_EXPLORE) {
+    #if defined(HAS_BT) && defined(HAS_NIMBLE_2)
+      RunGattExplore(scan_mode, color);
+    #endif
+  }
   else if (scan_mode == WIFI_SCAN_WAR_DRIVE) {
     this->reloadGeofences();
     this->geofence_paused = false;
@@ -3028,6 +3039,9 @@ void WiFiScan::StopScan(uint8_t scan_mode) {
   (currentScanMode == WIFI_ATTACK_RICK_ROLL) ||
   (currentScanMode == WIFI_ATTACK_FUNNY_BEACON) ||
   (currentScanMode == WIFI_ATTACK_AP_SPAM) ||
+  (currentScanMode == WIFI_SCAN_WPS) ||
+  (currentScanMode == WIFI_ATTACK_PROBE_SPAM) ||
+  (currentScanMode == WIFI_ATTACK_ROAM_BAIT) ||
   (currentScanMode == WIFI_PACKET_MONITOR) ||
   (currentScanMode == WIFI_SCAN_CHAN_ANALYZER) ||
   (currentScanMode == WIFI_SCAN_CHAN_ACT) ||
@@ -3110,6 +3124,7 @@ void WiFiScan::StopScan(uint8_t scan_mode) {
   (currentScanMode == BT_ATTACK_GOOGLE_SPAM) ||
   (currentScanMode == BT_ATTACK_FLIPPER_SPAM) ||
   (currentScanMode == BT_SPOOF_AIRTAG) ||
+  (currentScanMode == BT_GATT_EXPLORE) ||
   (currentScanMode == BT_SCAN_SKIMMERS) ||
   (currentScanMode == BT_SCAN_ANALYZER) ||
   (currentScanMode == BT_SCAN_SIMPLE) ||
@@ -5279,6 +5294,111 @@ int WiFiScan::connectAndProcessTracker(NimBLEAddress& address) {
   return -1;
 }
 
+// BLE GATT explorer: connect to a device and dump all services/characteristics/values to serial.
+void WiFiScan::runGattExplore(NimBLEAddress& address) {
+  this->createNimbleClient();
+
+  if (nimbleClient == nullptr) {
+    NimBLEDevice::deleteClient(nimbleClient);
+    nimbleClient = nullptr;
+    NimBLEDevice::deinit(true);
+    this->createNimbleClient();
+    if (nimbleClient == nullptr) {
+      Serial.println("GATT: failed to create NimBLE client");
+      return;
+    }
+  }
+
+  Serial.print("GATT: connecting to ");
+  Serial.println(address.toString().c_str());
+
+  nimbleClient->setConnectTimeout(15000);
+
+  if (!nimbleClient->connect(address, true, false, true)) {
+    Serial.printf("GATT: connection failed; error=%d\n", nimbleClient->getLastError());
+    NimBLEDevice::deleteClient(nimbleClient);
+    nimbleClient = nullptr;
+    return;
+  }
+
+  Serial.println("GATT: connected. Enumerating services...");
+
+  const auto& services = nimbleClient->getServices(true);
+  for (NimBLERemoteService* service : services) {
+    if (service == nullptr || !nimbleClient->isConnected()) break;
+
+    Serial.print("Service: ");
+    Serial.println(service->getUUID().toString().c_str());
+
+    const auto& characteristics = service->getCharacteristics(true);
+    for (NimBLERemoteCharacteristic* characteristic : characteristics) {
+      if (characteristic == nullptr || !nimbleClient->isConnected()) break;
+
+      String props = "";
+      if (characteristic->canRead())     props += "R";
+      if (characteristic->canWrite())    props += "W";
+      if (characteristic->canNotify())   props += "N";
+      if (characteristic->canIndicate()) props += "I";
+
+      Serial.print("  Char: ");
+      Serial.print(characteristic->getUUID().toString().c_str());
+      Serial.print(" [");
+      Serial.print(props);
+      Serial.print("]");
+
+      if (characteristic->canRead()) {
+        NimBLEAttValue val = characteristic->readValue();
+        Serial.print(" val=");
+        for (size_t i = 0; i < val.length(); i++)
+          Serial.printf("%02X", val[i]);
+      }
+
+      Serial.println();
+    }
+  }
+
+  Serial.println("GATT: enumeration complete. Disconnecting.");
+  if (nimbleClient->isConnected())
+    nimbleClient->disconnect();
+  NimBLEDevice::deleteClient(nimbleClient);
+  nimbleClient = nullptr;
+}
+
+void WiFiScan::setGattTarget(const uint8_t* mac) {
+  for (int i = 0; i < 6; i++)
+    this->gatt_target[i] = mac[i];
+  this->gatt_target_set = true;
+}
+// GATT explorer entry: pull target from ble_devices, connect + dump. Requires prior BT scan.
+void WiFiScan::RunGattExplore(uint8_t scan_mode, uint16_t color) {
+  #ifdef HAS_BT
+    #ifdef HAS_SCREEN
+      this->setupScanDisplayArea(TFT_BLACK, color);
+      #ifdef HAS_FULL_SCREEN
+        display_obj.tft.fillRect(0,16,TFT_WIDTH,16, color);
+        display_obj.tft.drawCentreString("GATT Explore",TFT_WIDTH / 2,16,2);
+      #endif
+      #ifdef HAS_ILI9341
+        display_obj.touchToExit();
+      #endif
+      display_obj.tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    #endif
+
+    this->setLEDMode(MODE_ATTACK);
+
+    #ifdef HAS_NIMBLE_2
+      if (!this->gatt_target_set) {
+        Serial.println("GATT: no target selected. Run a BT scan and pick a device.");
+        return;
+      }
+      this->shutdownBLE();
+      NimBLEAddress address(this->gatt_target, BLE_ADDR_PUBLIC);
+      this->runGattExplore(address);
+      this->gatt_target_set = false;
+    #endif
+  #endif
+}
+
 void WiFiScan::trackerNotifyCallback(NimBLERemoteCharacteristic* characteristic, uint8_t* data, size_t length, bool isNotify) {
   Serial.printf(
     "%s from %s, length=%u: ",
@@ -6625,6 +6745,38 @@ void WiFiScan::RunBeaconScan(uint8_t scan_mode, uint16_t color) {
   initTime = millis();
 }
 
+// Passive WPS vulnerability scanner. Reuses apSnifferCallbackFull; channel-hops like AP scan.
+void WiFiScan::RunWPSScan(uint8_t scan_mode, uint16_t color) {
+  startPcap("wps");
+
+  this->setLEDMode(MODE_SNIFF);
+
+  #ifdef HAS_SCREEN
+    this->setupScanDisplayArea(TFT_WHITE, color);
+    #ifdef HAS_FULL_SCREEN
+      display_obj.tft.fillRect(0,16,TFT_WIDTH,16, color);
+      display_obj.tft.drawCentreString("WPS Vuln Scan",TFT_WIDTH / 2,16,2);
+      #ifdef HAS_ILI9341
+        display_obj.touchToExit();
+      #endif
+    #endif
+    display_obj.tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    display_obj.tftDrawChannelScaleButtons(set_channel, false);
+    display_obj.tftDrawExitScaleButtons(false);
+    display_obj.tftDrawChanHopButton(false, settings_obj.loadSetting<bool>("ChanHop"));
+  #endif
+
+  esp_wifi_init(&cfg2);
+  #ifdef HAS_IDF_3
+    esp_wifi_set_country(&country);
+    esp_event_loop_create_default();
+  #endif
+  this->setWiFiMode(WIFI_MODE_NULL, apSnifferCallbackFull);
+  this->changeChannel(this->set_channel);
+  this->wifi_initialized = true;
+  initTime = millis();
+}
+
 void WiFiScan::startWardriverWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
@@ -7177,6 +7329,39 @@ void WiFiScan::apSnifferCallbackFull(void* buf, wifi_promiscuous_pkt_type_t type
   {
     len -= 4;
 
+    // Passive WPS vulnerability scan: flag APs advertising WPS + PIN-capable/unlocked setups.
+    if (wifi_scan_obj.currentScanMode == WIFI_SCAN_WPS) {
+      if ((snifferPacket->payload[0] == 0x80) || (snifferPacket->payload[0] == 0x50)) {
+        if (!wifi_scan_obj.seen_mac(&snifferPacket->payload[10])) {
+          wifi_scan_obj.save_mac(&snifferPacket->payload[10]);
+          uint16_t methods = 0;
+          bool locked = false;
+          if (WiFiScan::beaconWPSInfo(snifferPacket->payload, len, methods, locked)) {
+            bool pin_prone = (methods & (WPS_CONFIG_LABEL | WPS_CONFIG_DISPLAY | WPS_CONFIG_KEYPAD |
+                                         WPS_CONFIG_VIRT_DISPLAY | WPS_CONFIG_PHY_DISPLAY)) != 0;
+            String essid = "";
+            if (snifferPacket->payload[37] > 0)
+              for (int i = 0; i < snifferPacket->payload[37]; i++)
+                essid.concat((char)snifferPacket->payload[i + 38]);
+            if (essid == "") essid = addr;
+
+            String verdict = locked ? "LOCKED" : (pin_prone ? "PIN-PRONE" : "WPS");
+            String line = "WPS " + verdict + " " + addr + " ch:" +
+                          (String)snifferPacket->rx_ctrl.channel + " " + essid;
+            Serial.println(line);
+            #ifdef HAS_SCREEN
+              display_string = (pin_prone && !locked) ? RED_KEY : GREEN_KEY;
+              display_string.concat(verdict + " " + essid);
+              int temp_len = display_string.length();
+              for (int i = 0; i < 50 - temp_len; i++) display_string.concat(" ");
+              display_obj.display_buffer->add(display_string);
+            #endif
+          }
+        }
+      }
+      return;
+    }
+
     if ((wifi_scan_obj.currentScanMode == WIFI_SCAN_AP_STA) &&
         (snifferPacket->payload[0] == 0xC0) && (len >= 26)) {
       const uint16_t reason = snifferPacket->payload[24] |
@@ -7508,57 +7693,49 @@ void WiFiScan::apSnifferCallbackFull(void* buf, wifi_promiscuous_pkt_type_t type
   }
 }
 
-/*bool WiFiScan::beaconHasWPS(const uint8_t* payload, int len) {
-  int i = 36; // skip radiotap + fixed 802.11 header
+// Passive WPS scan: walk IEs for WPS vendor IE (OUI 00:50:F2 type 0x04).
+// Extracts Config Methods (0x1008) + AP Setup Locked (0x1057). Returns true if WPS present.
+bool WiFiScan::beaconWPSInfo(const uint8_t* payload, int len, uint16_t& config_methods, bool& locked) {
+  config_methods = 0;
+  locked = false;
+  bool found = false;
+  int i = 36; // skip radiotap-less 802.11 mgmt header (24) + fixed beacon fields (12)
 
-  while (i < len - 2) {
+  while (i + 2 <= len) {
     uint8_t tagNumber = payload[i];
     uint8_t tagLength = payload[i + 1];
 
     if (i + 2 + tagLength > len) break; // prevent overflow
     const uint8_t* tagData = &payload[i + 2];
 
-    // Look for Tag Number 0xDD (Vendor Specific)
-    if (tagNumber == 0xDD && tagLength >= 6) {
-      // Check for WPS OUI: 00:50:F2 and WPS type: 0x04
-      if (tagData[0] == 0x00 && tagData[1] == 0x50 && tagData[2] == 0xF2 && tagData[3] == 0x04) {
-        // Parse the WPS IE data starting after the OUI and type
-        int wpsLen = tagLength - 4;
-        const uint8_t* wpsData = &tagData[4];
-        int j = 0;
+    // Vendor Specific tag (0xDD) with WPS OUI 00:50:F2 type 0x04
+    if (tagNumber == 0xDD && tagLength >= 6 &&
+        tagData[0] == 0x00 && tagData[1] == 0x50 && tagData[2] == 0xF2 && tagData[3] == 0x04) {
+      found = true;
+      int wpsLen = tagLength - 4;
+      const uint8_t* wpsData = &tagData[4];
+      int j = 0;
 
-        while (j + 4 <= wpsLen) {
-          uint16_t attrType = (wpsData[j] << 8) | wpsData[j + 1];
-          uint16_t attrLen  = (wpsData[j + 2] << 8) | wpsData[j + 3];
+      while (j + 4 <= wpsLen) {
+        uint16_t attrType = (wpsData[j] << 8) | wpsData[j + 1];
+        uint16_t attrLen  = (wpsData[j + 2] << 8) | wpsData[j + 3];
 
-          if (j + 4 + attrLen > wpsLen) break; // prevent overflow
+        if (j + 4 + attrLen > wpsLen) break; // prevent overflow
 
-          if (attrType == 0x1008 && attrLen == 2) { // Config Methods attribute
-            uint16_t configMethods = (wpsData[j + 4] << 8) | wpsData[j + 5];
+        if (attrType == 0x1008 && attrLen == 2) // Config Methods
+          config_methods = (wpsData[j + 4] << 8) | wpsData[j + 5];
+        else if (attrType == 0x1057 && attrLen == 1) // AP Setup Locked
+          locked = (wpsData[j + 4] != 0);
 
-            // Check for any vulnerable method
-            if (configMethods & (WPS_CONFIG_LABEL |
-                                 WPS_CONFIG_DISPLAY |
-                                 WPS_CONFIG_KEYPAD |
-                                 WPS_CONFIG_VIRT_DISPLAY |
-                                 WPS_CONFIG_PHY_DISPLAY |
-                                 WPS_CONFIG_PUSH_BUTTON |
-                                 WPS_CONFIG_VIRT_PUSH_BUTTON |
-                                 WPS_CONFIG_PHY_PUSH_BUTTON)) {
-              return true;
-            }
-          }
-
-          j += 4 + attrLen;
-        }
+        j += 4 + attrLen;
       }
     }
 
     i += 2 + tagLength;
   }
 
-  return false;
-}*/
+  return found;
+}
 
 uint8_t WiFiScan::getSecurityType(const uint8_t* beacon, uint16_t len) {
   if (len < 36) return WIFI_SECURITY_OPEN;
@@ -9374,6 +9551,56 @@ void WiFiScan::broadcastSetSSID(uint32_t current_time, const char* ESSID, uint8_
   
 }
 
+// Beacon spam with 802.11r (Mobility Domain) + 802.11k (RM Enabled Caps) IEs to bait roaming clients.
+void WiFiScan::broadcastRoamBait(uint32_t currentTime) {
+  #ifndef HAS_DUAL_BAND
+    set_channel = random(1,12);
+  #else
+    set_channel = dual_band_channels[random(0, DUAL_BAND_CHANNELS)];
+  #endif
+  this->changeChannel(set_channel);
+
+  int ssidLen = random(1, 33);
+  int fullLen = ssidLen;
+
+  // Post-SSID: supported rates + DSSS current channel
+  uint8_t postSSID[13] = {0x01, 0x08, 0x82, 0x84, 0x8b, 0x96, 0x24, 0x30, 0x48, 0x6c,
+                          0x03, 0x01, 0x04};
+  // Mobility Domain IE (802.11r): tag 0x36, len 3 = MDID(2) + FT-capability(1)
+  uint8_t mdIE[5] = {0x36, 0x03, 0xAB, 0xCD, 0x01};
+  // RM Enabled Capabilities IE (802.11k): tag 0x46, len 5, neighbor-report bit set
+  uint8_t rmIE[7] = {0x46, 0x05, 0x73, 0x00, 0x00, 0x00, 0x00};
+
+  int frame_len = 38 + fullLen + sizeof(postSSID) + sizeof(mdIE) + sizeof(rmIE);
+  uint8_t temp_frame[frame_len];
+  memcpy(temp_frame, packet, 38);
+
+  // Randomize SRC MAC + BSSID
+  temp_frame[10] = temp_frame[16] = (random(256) & 0xFE) | 0x02;
+  temp_frame[11] = temp_frame[17] = random(256);
+  temp_frame[12] = temp_frame[18] = random(256);
+  temp_frame[13] = temp_frame[19] = random(256);
+  temp_frame[14] = temp_frame[20] = random(256);
+  temp_frame[15] = temp_frame[21] = random(256);
+
+  temp_frame[37] = fullLen;
+  for (int i = 0; i < fullLen; i++)
+    temp_frame[38 + i] = alfa[random(65)];
+
+  int off = 38 + fullLen;
+  memcpy(temp_frame + off, postSSID, sizeof(postSSID));
+  off += sizeof(postSSID);
+  temp_frame[off - 1] = set_channel; // DSSS current channel byte
+  memcpy(temp_frame + off, mdIE, sizeof(mdIE));
+  off += sizeof(mdIE);
+  memcpy(temp_frame + off, rmIE, sizeof(rmIE));
+
+  for (int i = 0; i < 3; i++)
+    esp_wifi_80211_tx(WIFI_IF_AP, temp_frame, frame_len, false);
+
+  packets_sent = packets_sent + 3;
+}
+
 // Function for sending crafted beacon frames
 void WiFiScan::broadcastRandomSSID(uint32_t currentTime) {
   
@@ -9481,6 +9708,47 @@ void WiFiScan::sendProbeAttack(uint32_t currentTime) {
       packets_sent = packets_sent + 3;
     }
   }
+}
+
+// Probe request flood with random SSIDs (no AP selection needed).
+void WiFiScan::sendProbeFlood(uint32_t currentTime) {
+  // Randomize SRC MAC
+  prob_req_packet[10] = (random(256) & 0xFE) | 0x02;
+  prob_req_packet[11] = random(256);
+  prob_req_packet[12] = random(256);
+  prob_req_packet[13] = random(256);
+  prob_req_packet[14] = random(256);
+  prob_req_packet[15] = random(256);
+
+  // Random SSID (1-32 chars)
+  int ssidLen = random(1, 33);
+  int fullLen = ssidLen;
+  prob_req_packet[25] = fullLen;
+
+  for (int i = 0; i < ssidLen; i++)
+    prob_req_packet[26 + i] = alfa[random(65)];
+
+  uint8_t postSSID[40] = {0x00, 0x00, 0x01, 0x08, 0x8c, 0x12,
+                          0x18, 0x24, 0x30, 0x48, 0x60, 0x6c,
+                          0x2d, 0x1a, 0xad, 0x01, 0x17, 0xff,
+                          0xff, 0x00, 0x00, 0x7e, 0x00, 0x00,
+                          0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+                          0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                          0x00, 0x00, 0x00, 0x00};
+
+  uint8_t good_probe_req_packet[26 + fullLen + 40] = {};
+
+  for (int i = 0; i < 26 + fullLen; i++)
+    good_probe_req_packet[i] = prob_req_packet[i];
+
+  for (int i = 0; i < 40; i++)
+    good_probe_req_packet[26 + fullLen + i] = postSSID[i];
+
+  esp_wifi_80211_tx(WIFI_IF_AP, good_probe_req_packet, sizeof(good_probe_req_packet), false);
+  esp_wifi_80211_tx(WIFI_IF_AP, good_probe_req_packet, sizeof(good_probe_req_packet), false);
+  esp_wifi_80211_tx(WIFI_IF_AP, good_probe_req_packet, sizeof(good_probe_req_packet), false);
+
+  packets_sent = packets_sent + 3;
 }
 
 void WiFiScan::sendDeauthFrame(uint8_t bssid[6], int channel, uint8_t mac[6]) {
@@ -12230,6 +12498,7 @@ void WiFiScan::main(uint32_t currentTime)
   // WiFi operations
   if ((currentScanMode == WIFI_SCAN_PROBE) ||
   (currentScanMode == WIFI_SCAN_AP) ||
+  (currentScanMode == WIFI_SCAN_WPS) ||
   (currentScanMode == WIFI_SCAN_STATION) ||
   (currentScanMode == WIFI_SCAN_AP_STA) ||
   (currentScanMode == WIFI_SCAN_PWN) ||
@@ -12707,6 +12976,32 @@ void WiFiScan::main(uint32_t currentTime)
       set_channel = random(1,12); 
       this->changeChannel(this->set_channel);
       delay(1);
+      initTime = millis();
+      this->displayTransmitRate();
+      packets_sent = 0;
+    }
+  }
+  else if (currentScanMode == WIFI_ATTACK_PROBE_SPAM)
+  {
+    for (int i = 0; i < 55; i++)
+      this->sendProbeFlood(currentTime);
+
+    if (currentTime - initTime >= 1000)
+    {
+      set_channel = random(1,12);
+      this->changeChannel(this->set_channel);
+      delay(1);
+      initTime = millis();
+      this->displayTransmitRate();
+      packets_sent = 0;
+    }
+  }
+  else if (currentScanMode == WIFI_ATTACK_ROAM_BAIT)
+  {
+    this->broadcastRoamBait(currentTime);
+
+    if (currentTime - initTime >= 1000)
+    {
       initTime = millis();
       this->displayTransmitRate();
       packets_sent = 0;
