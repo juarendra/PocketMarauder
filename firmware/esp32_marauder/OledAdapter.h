@@ -117,6 +117,7 @@ class OledDisplay : public Adafruit_SSD1306 {
   }
   // TFT_eSPI allows a second "word wrap" flag; the OLED wrap handling only
   // needs the first one.
+  void setTextWrap(bool wrap) { Adafruit_GFX::setTextWrap(wrap); }
   void setTextWrap(bool wrap, bool wordwrap) {
     (void)wordwrap;
     Adafruit_GFX::setTextWrap(wrap);
@@ -127,17 +128,17 @@ class OledDisplay : public Adafruit_SSD1306 {
 
   // Adafruit_GFX has no textWidth(); measure it with getTextBounds().
   int16_t textWidth(const char *s) {
-    int16_t x1, y1, w, h;
+    int16_t x1, y1; uint16_t w, h;
     Adafruit_GFX::getTextBounds(s, 0, 0, &x1, &y1, &w, &h);
     return w;
   }
   int16_t textWidth(const __FlashStringHelper *s) {
-    int16_t x1, y1, w, h;
+    int16_t x1, y1; uint16_t w, h;
     Adafruit_GFX::getTextBounds(s, 0, 0, &x1, &y1, &w, &h);
     return w;
   }
   int16_t textWidth(const String &s) {
-    int16_t x1, y1, w, h;
+    int16_t x1, y1; uint16_t w, h;
     Adafruit_GFX::getTextBounds(s, 0, 0, &x1, &y1, &w, &h);
     return w;
   }

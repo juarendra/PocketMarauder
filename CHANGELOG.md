@@ -5,6 +5,17 @@ Conventional Commits; each entry: context, change (paths), evidence, impact, rol
 
 ## Unreleased
 
+### feat: add PlatformIO build env for POCKET_MARAUDER
+- Context: board needs Arduino-ESP32 3.x / IDF 5.x (configs.h defines `HAS_IDF_3`, `HAS_NIMBLE_2`); stock PlatformIO `espressif32` is frozen on core 2.x. Provide a reproducible device build alongside the existing `[env:native]` Unity host tests.
+- Change:
+  - `firmware/platformio.ini`: NEW additive `[env:pocket_marauder]` on the pioarduino platform fork (`platform-espressif32` release `55.03.312-1`, Arduino 3.3.12 / IDF 5.5.5), `board = esp32dev`, `framework = arduino`, `board_build.partitions = min_spiffs.csv`, `lib_extra_dirs` for vendored libs, `build_src_filter` excluding `libraries/` from the src builder, `build_flags` `-Wno-error=return-type -fcommon -Wl,--allow-multiple-definition` (upstream relies on pre-GCC10 defaults + ODR clashes), `extra_scripts = pre:tools/pio_framework_libs.py`. `[env:native]` untouched.
+  - NEW `firmware/tools/pio_framework_libs.py`: adds every bundled framework library `src` dir to the global include path (arduino-esp32 3.x libs cross-include with no `depends=`), and force-builds+links the `Network` library that LDF misses (WiFi reaches it only via a quoted include).
+  - `firmware/esp32_marauder/configs.h`: added `SCREEN_BUFFER`/`MAX_SCREEN_BUFFER 6` and a `POCKET_MARAUDER` MENU DEFINITIONS block (`BANNER_TIME`, `COMMAND_PREFIX`, `KEY_*`, `BUTTON_PADDING`) the build required.
+  - `firmware/esp32_marauder/OledAdapter.h`: `setTextWrap()`, `getTextBounds` `uint16_t w,h` signature fixes for the 3.x Adafruit_GFX.
+- Evidence: `python -m platformio run -e pocket_marauder` -> `SUCCESS`, RAM 24.9% (81620/327680), Flash 80.9% (1590663/1966080), `firmware.bin` + combined `firmware.factory.bin` created.
+- Impact: reproducible device firmware build; host-test env unaffected.
+- Rollback: delete `[env:pocket_marauder]` and `firmware/tools/pio_framework_libs.py`; revert the configs.h/OledAdapter.h hunks.
+
 ### feat: native SSD1306 OLED display backend
 - Context: upstream firmware only supports TFT_eSPI color displays; PocketMarauder has a 128x64 mono SSD1306 I2C OLED. Needed a shim exposing the full TFT_eSPI method surface over Adafruit_SSD1306.
 - Change:

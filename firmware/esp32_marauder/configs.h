@@ -143,6 +143,8 @@
     #define HAS_BUTTONS
     #define HAS_SCREEN
     #define HAS_MINI_SCREEN
+    #define HAS_NIMBLE_2
+    #define HAS_IDF_3
     // No SD, GPS, battery ADC, or temp sensor on this board.
   #endif
 
@@ -2002,6 +2004,9 @@
 
       #define SCREEN_CHAR_WIDTH 40
 
+      #define SCREEN_BUFFER
+      #define MAX_SCREEN_BUFFER 6
+
       // SSD1306 128x64 monochrome OLED on I2C.
       #define OLED_SDA 21
       #define OLED_SCL 22
@@ -2287,6 +2292,24 @@
   //// END DISPLAY DEFINITIONS
 
   //// MENU DEFINITIONS
+  #ifdef POCKET_MARAUDER
+    #define BANNER_TIME 50
+
+    #define COMMAND_PREFIX "!"
+
+    // Keypad start position, key sizes and spacing
+    #define KEY_X (TFT_WIDTH/2) // Centre of key
+    #define KEY_Y (TFT_HEIGHT/4.5)
+    #define KEY_W TFT_WIDTH // Width and height
+    #define KEY_H (TFT_HEIGHT/12.8)
+    #define KEY_SPACING_X 0 // X and Y gap
+    #define KEY_SPACING_Y 1
+    #define KEY_TEXTSIZE 1   // Font size multiplier
+    #define ICON_W 22
+    #define ICON_H 22
+    #define BUTTON_PADDING 10
+  #endif
+
   #ifdef MARAUDER_V4
     #define BANNER_TIME 100
     
