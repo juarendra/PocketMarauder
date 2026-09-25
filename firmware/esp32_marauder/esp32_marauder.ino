@@ -247,7 +247,7 @@ void setup()
   #ifdef HAS_ACT_LED
     pinMode(ACT_LED_PIN, OUTPUT);
     delay(100);
-    digitalWrite(ACT_LED_PIN, LOW);
+    digitalWrite(ACT_LED_PIN, ACT_LED_OFF);
   #endif
 
   while(!Serial)

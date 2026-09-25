@@ -5,6 +5,16 @@ Conventional Commits; each entry: context, change (paths), evidence, impact, rol
 
 ## Unreleased
 
+### feat: enable battery ADC sensing + activity LED for POCKET_MARAUDER
+- Context: board has a LiPo path (TP4056/DW01A/FS8205A) with a voltage divider on IO34 (net `D34`) and a green GPIO LED on IO19 (net `LED`, active-low). Firmware had battery/LED disabled for this target; user wants a battery state indicator + percentage on the OLED and the LED driven by firmware.
+- Change:
+  - `firmware/esp32_marauder/configs.h`: POCKET_MARAUDER feature block (~148-152) — added `HAS_BATTERY`, `BATTERY_ADC_PIN 34`, `BATTERY_ADC_MULTIPLIER_X100 502`, `HAS_ACT_LED`, removed stale "no battery" comment; ACT LED STUFF block (~3318) — `ACT_LED_PIN 19` + `ACT_LED_ACTIVE_LOW` and `ACT_LED_ON`/`ACT_LED_OFF` polarity macros (stock boards keep active-high).
+  - `firmware/esp32_marauder/BatteryInterface.cpp`: ADC path sets `i2c_supported = true` so `MenuFunctions::battery()` renders the percentage on mini/OLED screens (previously gated on i2c fuel gauge only); replaced hardcoded `* 2` divider scale with `BATTERY_ADC_MULTIPLIER_X100 / 100` (5.02x for R3=10k / R4=40.2k, matches this board; stock boards unaffected when they define their own pin).
+  - `firmware/esp32_marauder/esp32_marauder.ino` + `WiFiScan.cpp`: the 4 `digitalWrite(ACT_LED_PIN, LOW/HIGH)` sites now use `ACT_LED_ON`/`ACT_LED_OFF` so the active-low LED lights while scanning (was inverted on this board).
+- Evidence: `python -m platformio run -e pocket_marauder` -> `SUCCESS`, RAM 24.9% (81716/327680), Flash 81.4% (1599767/1966080). Divider verified from schematic `PCB/EAGLE/espmarauder.sch`: R3=10k to GND, R4=40.2k to switched cell rail (net labelled `+5V`, electrically the battery V+ after BATT_SW feeding boost IC2 VIN), tap to IO34.
+- Impact: OLED status bar shows battery % (green >20%, red otherwise) polled every 3s; activity LED on IO19 lights during WiFi scan/attack, off otherwise.
+- Rollback: remove the 5 lines from the POCKET_MARAUDER feature block, the `ACT_LED_PIN 19`/polarity block from ACT LED STUFF, revert the two `BatteryInterface.cpp` lines and the 4 `digitalWrite` sites back to `LOW`/`HIGH`.
+
 ### feat: add PlatformIO build env for POCKET_MARAUDER
 - Context: board needs Arduino-ESP32 3.x / IDF 5.x (configs.h defines `HAS_IDF_3`, `HAS_NIMBLE_2`); stock PlatformIO `espressif32` is frozen on core 2.x. Provide a reproducible device build alongside the existing `[env:native]` Unity host tests.
 - Change:

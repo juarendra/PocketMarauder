@@ -145,7 +145,11 @@
     #define HAS_MINI_SCREEN
     #define HAS_NIMBLE_2
     #define HAS_IDF_3
-    // No SD, GPS, battery ADC, or temp sensor on this board.
+    #define HAS_BATTERY
+    #define BATTERY_ADC_PIN 34   // IO34/ADC1_CH6: R3=10k / R4=40.2k divider off switched cell (net +5V)
+    #define BATTERY_ADC_MULTIPLIER_X100 502  // (10k+40.2k)/10k = 5.02x, x100 for integer math
+    #define HAS_ACT_LED          // green LED on IO19, active-low
+    // No SD, GPS, or temp sensor on this board.
   #endif
 
   #if defined(MARAUDER_M5STICKC) || defined(MARAUDER_M5STICKCP2)
@@ -3309,6 +3313,19 @@
 
     #ifdef MARAUDER_V8
       #define ACT_LED_PIN 28
+    #endif
+
+    #ifdef POCKET_MARAUDER
+      #define ACT_LED_PIN 19
+      #define ACT_LED_ACTIVE_LOW
+    #endif
+
+    #ifdef ACT_LED_ACTIVE_LOW
+      #define ACT_LED_ON  LOW
+      #define ACT_LED_OFF HIGH
+    #else
+      #define ACT_LED_ON  HIGH
+      #define ACT_LED_OFF LOW
     #endif
 
   #endif

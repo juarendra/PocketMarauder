@@ -2608,12 +2608,12 @@ void WiFiScan::StartScan(uint8_t scan_mode, uint16_t color) {
   this->initWiFi(scan_mode);
   if (scan_mode == WIFI_SCAN_OFF) {
     #ifdef HAS_ACT_LED
-      digitalWrite(ACT_LED_PIN, LOW);
+      digitalWrite(ACT_LED_PIN, ACT_LED_OFF);
     #endif
     StopScan(scan_mode);
   } else {
     #ifdef HAS_ACT_LED
-      digitalWrite(ACT_LED_PIN, HIGH);
+      digitalWrite(ACT_LED_PIN, ACT_LED_ON);
     #endif
   }
 
@@ -2782,7 +2782,7 @@ void WiFiScan::StartScan(uint8_t scan_mode, uint16_t color) {
     RunPortScanAll(scan_mode, color);
   else {
     #ifdef HAS_ACT_LED
-      digitalWrite(ACT_LED_PIN, LOW);
+      digitalWrite(ACT_LED_PIN, ACT_LED_OFF);
     #endif
   }
 
