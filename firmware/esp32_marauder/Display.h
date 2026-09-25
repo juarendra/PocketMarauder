@@ -15,7 +15,11 @@
 #include "Assets.h"
 #include "BootSplash.h"
 
+#ifdef POCKET_MARAUDER
+#include "OledAdapter.h"
+#else
 #include <TFT_eSPI.h>
+#endif
 
 // Reject board/display configuration mismatches at compile time. A mismatched
 // TFT setup can boot normally while driving the wrong controller and pins.
@@ -92,12 +96,21 @@ class Display
     #ifdef SCREEN_BUFFER
       void scrollScreenBuffer(bool down = false);
     #endif
+#ifdef POCKET_MARAUDER
+    void processAndPrintString(OledDisplay& tft, const String& originalString);
+#else
     void processAndPrintString(TFT_eSPI& tft, const String& originalString);
+#endif
 
   public:
     Display();
+#ifdef POCKET_MARAUDER
+    OledDisplay tft = OledDisplay();
+    OledButton key[BUTTON_ARRAY_LEN + 4];
+#else
     TFT_eSPI tft = TFT_eSPI();
     TFT_eSPI_Button key[BUTTON_ARRAY_LEN + 4];
+#endif
     const String PROGMEM version_number = MARAUDER_VERSION;
 
     #ifdef HAS_CYD_TOUCH

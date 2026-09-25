@@ -2,6 +2,9 @@
 #include "BootSplashBitmap.h"
 #include "DisplayLine.h"
 #include "lang_var.h"
+#ifdef POCKET_MARAUDER
+  #include "pocket_logo.h"
+#endif
 
 #ifdef HAS_SCREEN
 
@@ -287,6 +290,23 @@ void Display::RunSetup() {
 }
 
 void Display::drawBootSplash() {
+#ifdef POCKET_MARAUDER
+  tft.fillScreen(TFT_BLACK);
+  tft.drawXBitmap(0, 0, pocket_logo_bits, POCKET_LOGO_W, POCKET_LOGO_H, TFT_WHITE);
+  tft.display();
+  delay(1500);
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextWrap(false);
+  tft.setFreeFont(NULL);
+  tft.setTextSize(1);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.drawCentreString("PocketMarauder", TFT_WIDTH / 2, 20, 1);
+  tft.drawCentreString(version_number, TFT_WIDTH / 2, 34, 1);
+  tft.display();
+  delay(800);
+  return;
+}
+#else
   const int16_t width = tft.width();
   const int16_t height = tft.height();
   #ifdef MARAUDER_CYD_3_5_INCH
@@ -333,6 +353,7 @@ void Display::drawBootSplash() {
   tft.drawCentreString("Initializing...", width / 2, layout.status_y, 1);
   tft.setTextSize(1);
 }
+#endif
 
 void Display::tftDrawGraphObjects(byte x_scale)
 {
@@ -632,6 +653,9 @@ void Display::clearScreen()
     tft.fillRect(0, 0, TFT_WIDTH, TFT_HEIGHT, TFT_BLACK);
     tft.setCursor(0, 0);
   #endif
+#ifdef POCKET_MARAUDER
+  tft.display();
+#endif
 }
 
 #ifdef SCREEN_BUFFER
@@ -643,7 +667,11 @@ void Display::scrollScreenBuffer(bool down) {
 }
 #endif
 
+#ifdef POCKET_MARAUDER
+void Display::processAndPrintString(OledDisplay& tft, const String& originalString) {
+#else
 void Display::processAndPrintString(TFT_eSPI& tft, const String& originalString) {
+#endif
   // Define colors
   uint16_t text_color = TFT_GREEN; // Default text color
   uint16_t background_color = TFT_BLACK; // Default background color
@@ -759,6 +787,9 @@ void Display::showCenterText(const char* text, int y, bool small_pp, uint8_t tex
     tft.setCursor((SCREEN_WIDTH - (len * 6)) / 2, y);
 
   tft.println(text);
+#ifdef POCKET_MARAUDER
+  tft.display();
+#endif
 }
 
 
