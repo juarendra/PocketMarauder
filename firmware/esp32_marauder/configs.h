@@ -42,6 +42,10 @@
   //#define MARAUDER_MINI_V3
   //#define MARAUDER_M5_NANO_C6
   //#define DUAL_MINI_C5
+  //#define POCKET_MARAUDER  // custom board: ESP32-WROOM-32D + SSD1306 OLED + 4 buttons
+
+  // Active target for this repo. Comment out to build a stock Marauder variant above.
+  #define POCKET_MARAUDER
   //// END BOARD TARGETS
 
   // Allocated only while settings are loaded or updated. This accommodates
@@ -121,6 +125,8 @@
     #define HARDWARE_NAME "Dual Mini C5"
   #elif defined(MARAUDER_M5_NANO_C6)
     #define HARDWARE_NAME "M5 Nano C6"
+  #elif defined(POCKET_MARAUDER)
+    #define HARDWARE_NAME "PocketMarauder"
   #else
     #define HARDWARE_NAME "ESP32"
   #endif
@@ -130,6 +136,14 @@
  //// BOARD FEATURES
   #if defined(DUAL_MINI_C5)
     #define MARAUDER_MINI_V3
+  #endif
+
+  #ifdef POCKET_MARAUDER
+    #define HAS_BT
+    #define HAS_BUTTONS
+    #define HAS_SCREEN
+    #define HAS_MINI_SCREEN
+    // No SD, GPS, battery ADC, or temp sensor on this board.
   #endif
 
   #if defined(MARAUDER_M5STICKC) || defined(MARAUDER_M5STICKCP2)
@@ -936,6 +950,28 @@
 
       #define HAS_L
       #define HAS_R
+      #define HAS_U
+      #define HAS_D
+      #define HAS_C
+
+      #define L_PULL true
+      #define C_PULL true
+      #define U_PULL true
+      #define R_PULL true
+      #define D_PULL true
+    #endif
+
+    #ifdef POCKET_MARAUDER
+      // Board buttons (all active-low, external 10k pullups):
+      // BTN A=IO35 (Up), BTN B=IO32 (Left/Back), BTN C=IO33 (Center/Select), BTN D=IO25 (Down).
+      #define L_BTN 32
+      #define C_BTN 33
+      #define U_BTN 35
+      #define R_BTN -1
+      #define D_BTN 25
+
+      #define HAS_L
+      //#define HAS_R
       #define HAS_U
       #define HAS_D
       #define HAS_C
@@ -1959,6 +1995,67 @@
       #define STATUSBAR_COLOR 0x4A49
     
       #define KIT_LED_BUILTIN 13
+    #endif
+
+    #ifdef POCKET_MARAUDER
+      #define CHAN_PER_PAGE 7
+
+      #define SCREEN_CHAR_WIDTH 40
+
+      // SSD1306 128x64 monochrome OLED on I2C.
+      #define OLED_SDA 21
+      #define OLED_SCL 22
+      #define OLED_ADDR 0x3C
+      #define OLED_RST -1
+
+      #define BANNER_TEXT_SIZE 1
+
+      #ifndef TFT_WIDTH
+        #define TFT_WIDTH 128
+      #endif
+
+      #ifndef TFT_HEIGHT
+        #define TFT_HEIGHT 64
+      #endif
+
+      #define GRAPH_VERT_LIM TFT_HEIGHT/2 - 1
+
+      #define EXT_BUTTON_WIDTH 0
+
+      #define SCREEN_ORIENTATION 0
+
+      #define CHAR_WIDTH 6
+      #define SCREEN_WIDTH TFT_WIDTH
+      #define SCREEN_HEIGHT TFT_HEIGHT
+      #define HEIGHT_1 TFT_HEIGHT
+      #define WIDTH_1 TFT_WIDTH
+      #define STANDARD_FONT_CHAR_LIMIT (TFT_WIDTH/6)
+      #define TEXT_HEIGHT 8
+      #define BOT_FIXED_AREA 0
+      #define TOP_FIXED_AREA 16
+      #define YMAX TFT_HEIGHT
+      #define minimum(a,b)     (((a) < (b)) ? (a) : (b))
+      #define MENU_FONT NULL
+      #define BUTTON_SCREEN_LIMIT 6
+      #define BUTTON_ARRAY_LEN BUTTON_SCREEN_LIMIT
+      #define STATUS_BAR_WIDTH 8
+      #define LVGL_TICK_PERIOD 6
+
+      #define FRAME_X 100
+      #define FRAME_Y 64
+      #define FRAME_W 120
+      #define FRAME_H 50
+
+      #define REDBUTTON_X FRAME_X
+      #define REDBUTTON_Y FRAME_Y
+      #define REDBUTTON_W (FRAME_W/2)
+      #define REDBUTTON_H FRAME_H
+      #define GREENBUTTON_X (REDBUTTON_X + REDBUTTON_W)
+      #define GREENBUTTON_Y FRAME_Y
+      #define GREENBUTTON_W (FRAME_W/2)
+      #define GREENBUTTON_H FRAME_H
+
+      #define STATUSBAR_COLOR 0x4A49
     #endif
   
     #ifdef MARAUDER_MINI
