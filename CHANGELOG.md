@@ -5,6 +5,17 @@ Conventional Commits; each entry: context, change (paths), evidence, impact, rol
 
 ## Unreleased
 
+### docs: add user manual, README, LICENSE, OLED sim images, hardware placeholder
+- Context: user requested a complete detailed end-user manual, a project README, a chosen license, simulated OLED display images, and a hardware image placeholder (real hardware photo to be supplied later by user).
+- Change:
+  - NEW `LICENSE`: full GNU GPL v3 text + PocketMarauder copyright header. Chose GPL-3.0 because this repo is a fork of ESP32Marauder (upstream is GPL-3.0); a permissive license would violate upstream copyleft.
+  - REWROTE `README.md`: hardware overview (placeholder image), feature table (stock + 4 PocketMarauder additions), build/flash, repo structure, license + legal disclaimer.
+  - NEW `docs/USER_MANUAL.md`: 12-section end-user manual (Indonesian) — buttons/navigation, power/battery/LED, boot, full menu tree, stock features summary, the 4 added features in depth (what they do, how to run, expected serial output, notes), status bar, serial-monitor usage, troubleshooting table, FAQ, legal disclaimer.
+  - NEW `docs/images/`: 10 simulated 128x64 monochrome OLED screens (boot, main menu, WiFi menu, WiFi sniffer, WiFi attacks, BT attacks, WPS scan, probe spam, GATT explore, roam bait) rendered at 4x scale + 1 `hardware-placeholder.png` for the device (to be replaced with a real photo/diagram).
+- Evidence: `docs/images/` contains 11 PNGs; all 11 `images/*.png` references in USER_MANUAL.md resolve to existing files (verified via grep).
+- Impact: end users get a self-contained manual + visual reference; project is now licensed (GPL-3.0) and documented. No firmware code changed.
+- Rollback: delete `LICENSE`, `docs/USER_MANUAL.md`, `docs/images/`, and revert `README.md`.
+
 ### feat: add 4 pentest features (WPS scan, probe spam, GATT explore, roam bait) for POCKET_MARAUDER
 - Context: user requested 4 additive pentest tools wired into the menu + scan dispatch. All legal-equivalent (no RF jammer). WPS downgraded to a passive scanner (ESP32 has no WPS supplicant injection).
 - Change (all `POCKET_MARAUDER`-neutral; new scan-mode ids 87-90):
